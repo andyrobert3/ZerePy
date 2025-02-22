@@ -175,6 +175,13 @@ class SonicConnection(BaseConnection):
                     ActionParameter("amount", True, float, "Amount to withdraw")
                 ],
                 description="Withdraw tokens from a MachFi protocol"
+            ),
+            "interest-rates": Action(
+                name="interest-rates",
+                parameters=[
+                    ActionParameter("token_address", True, str, "Token address to get interest rates for")
+                ],
+                description="Get the interest rates for a token"
             )
         }
 
@@ -439,6 +446,15 @@ class SonicConnection(BaseConnection):
             return f"🔄 Withdraw as collateral transaction sent: {self._get_explorer_link(tx_hash)}"
         except Exception as e:
             logger.error(f"Withdraw as collateral failed: {e}")
+            raise
+
+    def interest_rates(self, token_address: str) -> str:
+        """Get the interest rates for a token"""
+        try:
+            supply_rate, borrow_rate = self.machfi.get_interest_rates(token_address)
+            return f"🔄 Supply rate: {supply_rate:.2f}%, Borrow rate: {borrow_rate:.2f}%"
+        except Exception as e:
+            logger.error(f"Failed to get interest rates: {e}")
             raise
 
     def swap(self, token_in: str, token_out: str, amount: float, slippage: float = 0.5) -> str:
