@@ -4,6 +4,8 @@ import requests
 import time
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv, set_key
+from src.helpers.sonic.silo import Silo
+from src.helpers.sonic.vicuna import Vicuna
 from web3 import Web3
 from web3.middleware import geth_poa_middleware
 from src.helpers.sonic.machfi import MachFi
@@ -42,7 +44,6 @@ class SonicConnection(BaseConnection):
         self.NATIVE_TOKEN = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
         self.aggregator_api = "https://aggregator-api.kyberswap.com/sonic/api/v1"
 
-
         private_key = os.getenv('SONIC_PRIVATE_KEY')
         account = self._web3.eth.account.from_key(private_key)
 
@@ -51,10 +52,23 @@ class SonicConnection(BaseConnection):
             "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE": "0x9F5d9f2FDDA7494aA58c90165cF8E6B070Fe92e6", # cSonic
             "0x29219dd400f2Bf60E5a23d13Be72B486D4038894": "0xC84F54B2dB8752f80DEE5b5A48b64a2774d2B445", # cUSDC
             "0x50c42dEAcD8Fc9773493ED674b675bE577f2634b": "0x15eF11b942Cc14e582797A61e95D47218808800D", # cWETH
-            "0xE5DA20F15420aD15DE0fa650600aFc998bbE3955": "0xd3DCe716f3eF535C5Ff8d041c1A41C3bd89b97aE" # cStS
+            "0xE5DA20F15420aD15DE0fa650600aFc998bbE3955": "0xbAA06b4D6f45ac93B6c53962Ea861e6e3052DC74", # cStS
+            "0xd3DCe716f3eF535C5Ff8d041c1A41C3bd89b97aE": "0xe5A79Db6623BCA3C65337dd6695Ae6b1f53Bec45" # cscUSD
         }
 
+        vicuna_pool = Web3.to_checksum_address("0xaa1C02a83362BcE106dFf6eB65282fE8B97A1665")
+
+        self.vicuna_assets = set([
+            Web3.to_checksum_address("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"), # S
+            Web3.to_checksum_address("0x039e2fB66102314Ce7b64Ce5Ce3E5183bc94aD38"), # wS
+            Web3.to_checksum_address("0x29219dd400f2Bf60E5a23d13Be72B486D4038894"), # USDC
+            Web3.to_checksum_address("0x50c42dEAcD8Fc9773493ED674b675bE577f2634b"), # WETH
+            Web3.to_checksum_address("0xE5DA20F15420aD15DE0fa650600aFc998bbE3955"), # StS
+            Web3.to_checksum_address("0xd3DCe716f3eF535C5Ff8d041c1A41C3bd89b97aE") # scUSD
+        ])
+
         self.machfi = MachFi(self._web3, self.token_mapping, account)
+        self.vicuna = Vicuna(self._web3, vicuna_pool, self.vicuna_assets, account)
 
     def _get_explorer_link(self, tx_hash: str) -> str:
         """Generate block explorer link for transaction"""
@@ -451,8 +465,13 @@ class SonicConnection(BaseConnection):
     def interest_rates(self, token_address: str) -> str:
         """Get the interest rates for a token"""
         try:
-            supply_rate, borrow_rate = self.machfi.get_interest_rates(token_address)
-            return f"🔄 Supply rate: {supply_rate:.2f}%, Borrow rate: {borrow_rate:.2f}%"
+            mf_supply_rate, mf_borrow_rate = self.machfi.get_interest_rates(token_address)
+            machfi_interest_rate = f"🔄 MachFi Supply rate: {mf_supply_rate:.2f}%, MachFi Borrow rate: {mf_borrow_rate:.2f}%"
+
+            vicuna_supply_rate, vicuna_borrow_rate = self.vicuna.get_interest_rates(token_address)
+            vicuna_interest_rate = f"🔄 Vicuna Supply rate: {vicuna_supply_rate:.2f}%, Vicuna Borrow rate: {vicuna_borrow_rate:.2f}%"
+
+            return f"{machfi_interest_rate}\n{vicuna_interest_rate}"
         except Exception as e:
             logger.error(f"Failed to get interest rates: {e}")
             raise
@@ -523,6 +542,7 @@ class SonicConnection(BaseConnection):
         except Exception as e:
             logger.error(f"Swap failed: {e}")
             raise
+
     def perform_action(self, action_name: str, kwargs) -> Any:
         """Execute a Sonic action with validation"""
         if action_name not in self.actions:

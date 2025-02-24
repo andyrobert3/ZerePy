@@ -176,11 +176,6 @@ class MachFi:
             blocks_per_year = 365 * 24 * 60 * 60
             supply_rate_yearly = (((1 + supply_rate / 1e18) ** blocks_per_year) - 1) * 100
             borrow_rate_yearly = (((1 + borrow_rate / 1e18) ** blocks_per_year) - 1) * 100
-
-            # Print rates
-            logger.info(f"Supply rate: {supply_rate_yearly:.2f}%")
-            logger.info(f"Borrow rate: {borrow_rate_yearly:.2f}%")
-            
             return supply_rate_yearly, borrow_rate_yearly
             
         except Exception as e:
